@@ -1,3 +1,4 @@
 # My-Machine-Learning
 Record my learning route
-and some simple examples of machine learning
+and Some simple examples of machine learning using Python 3.
+
