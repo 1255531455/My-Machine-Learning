@@ -108,4 +108,4 @@ print("---Confusion Matrix---")
 print(pd.crosstab(preds, test_labels))
 
 #####################################################
-
+plt.show()

@@ -41,8 +41,8 @@ plt.xlabel('Size of house')
 plt.ylabel('Asking price(1000s)')
 plt.title("Size of Houses and Their Asking Prices")
 
+plt.show()
 
-# plt.show()
 
 # prediction
 def will_it_sell(size, price):

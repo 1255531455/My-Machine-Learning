@@ -9,7 +9,6 @@ iris = datasets.load_iris()
 X = iris.data[:, :2]  # take the first two features
 y = iris.target
 
-
 # 当k值越高边界越平滑，可能出现欠拟合；k值越低可能出现过度拟合
 k = 13
 knn = KNeighborsClassifier(n_neighbors=k)

@@ -13,6 +13,7 @@ model = LinearRegression()
 x = df.x[0:6, np.newaxis]   # convert to 2D array
 y = df.y[0:6, np.newaxis]   # convert to 2D array
 
+print(x.shape)
 model.fit(x, y)
 
 y_pred = model.predict(x)
