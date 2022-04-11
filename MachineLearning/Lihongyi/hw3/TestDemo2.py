@@ -18,6 +18,6 @@ model.compile(optimizer='adam',
 
 model.fit(x_train, y_train, epochs=20, batch_size=100)  #0.0624
 model.evaluate(x_test, y_test)
-#result = model.predict(x_test)
-#print(result[1])
+result = model.predict(x_test)
+print(result[1])
 

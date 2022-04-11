@@ -1,93 +1,62 @@
-import pandas as pd
+#-*- coding:utf-8 -*-
+# @File    : Predict_PM2dot5.py
+# @Date    : 2019-05-19
+# @Author  : 追风者
+# @Software: PyCharm
+# @Python Version: python 3.6
+
 import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-# 数据预处理
-def dataProcess(df):
-    x_list, y_list = [], []
-    # df替换指定元素，将空数据填充为0
-    df = df.replace(['NR'], [0.0])
-    # astype() 转换array中元素数据类型
-    array = np.array(df).astype(float)
-    # 将数据集拆分为多个数据帧
-    for i in range(0, 4320, 18):
-        for j in range(24-9):
-            mat = array[i:i+18, j:j+9]
-            label = array[i+9, j+9] # 第10行是PM2.5
-            x_list.append(mat)
-            y_list.append(label)
-    x = np.array(x_list)
-    y = np.array(y_list)
+# 数据读取与预处理
+train_data = pd.read_csv("./train.csv")
+train_data.drop(['Date', 'stations'], axis=1, inplace=True)
+column = train_data['observation'].unique()
+# print(column)
+new_train_data = pd.DataFrame(np.zeros([24*240, 18]), columns=column)
 
-    '''
-    # 将每行数据都scale到0到1的范围内，有利于梯度下降，但经尝试发现效果并不好
-    for i in range(18):
-        if(np.max(x[:, i, :]) != 0):
-            x[: , i, :] /= np.max(x[:, i, :])
-    '''
-    return x, y, array
+for i in column:
+    train_data1 = train_data[train_data['observation'] == i]
+    # Be careful with the inplace, as it destroys any data that is dropped!
+    train_data1.drop(['observation'], axis=1, inplace=True)
+    train_data1 = np.array(train_data1)
+    train_data1[train_data1 == 'NR'] = '0'
+    train_data1 = train_data1.astype('float')
+    train_data1 = train_data1.reshape(1, 5760)
+    train_data1 = train_data1.T
+    new_train_data[i] = train_data1
 
-# 更新参数，训练模型
-def train(x_train, y_train, epoch):
-    bias = 0 # 偏置值初始化
-    weights = np.ones(9) # 权重初始化
-    learning_rate = 1 # 初始学习率
-    reg_rate = 0.001 # 正则项系数
-    bg2_sum = 0 # 用于存放偏置值的梯度平方和
-    wg2_sum = np.zeros(9) # 用于存放权重的梯度平方和
+label = np.array(new_train_data['PM2.5'][9:], dtype='float32')
 
-    for i in range(epoch):
-        b_g = 0
-        w_g = np.zeros(9)
-        # 在所有数据上计算Loss_label的梯度
-        for j in range(3200):
-            b_g += (y_train[j] - weights.dot(x_train[j, 9, :]) - bias) * (-1)
-            for k in range(9):
-                w_g[k] += (y_train[j] - weights.dot(x_train[j, 9, :]) - bias) * (-x_train[j, 9, k])
-        # 求平均
-        b_g /= 3200
-        w_g /= 3200
-        #  加上Loss_regularization在w上的梯度
-        for m in range(9):
-            w_g[m] += reg_rate * weights[m]
+# 探索性数据分析 EDA
+# 最简单粗暴的方式就是根据 HeatMap 热力图分析各个指标之间的关联性
+f, ax = plt.subplots(figsize=(9, 6))
+sns.heatmap(new_train_data.corr(), fmt="d", linewidths=0.5, ax=ax)
+plt.show()
 
-        # adagrad
-        bg2_sum += b_g**2
-        wg2_sum += w_g**2
-        # 更新权重和偏置
-        bias -= learning_rate/bg2_sum**0.5 * b_g
-        weights -= learning_rate/wg2_sum**0.5 * w_g
-
-        # 每训练200轮，输出一次在训练集上的损失
-        if i%200 == 0:
-            loss = 0
-            for j in range(3200):
-                loss += (y_train[j] - weights.dot(x_train[j, 9, :]) - bias)**2
-            print('after {} epochs, the loss on train data is:'.format(i), loss/3200)
-
-    return weights, bias
-
-# 验证模型效果
-def validate(x_val, y_val, weights, bias):
+# 模型选择
+# a.数据归一化
+# 使用前九个小时的 PM2.5 来预测第十个小时的 PM2.5，使用线性回归模型
+PM = new_train_data['PM2.5']
+PM_mean = int(PM.mean())
+PM_theta = int(PM.var()**0.5)
+PM = (PM - PM_mean) / PM_theta
+w = np.random.rand(1, 10)
+theta = 0.1
+m = len(label)
+for i in range(100):
     loss = 0
-    for i in range(400):
-        loss += (y_val[i] - weights.dot(x_val[i, 9, :]) - bias)**2
-    return loss / 400
+    i += 1
+    gradient = 0
+    for j in range(m):
+        x = np.array(PM[j : j + 9])
+        x = np.insert(x, 0, 1)
+        error = label[j] - np.matmul(w, x)
+        loss += error**2
+        gradient += error * x
 
-def main():
-    # 从csv中读取有用的信息
-    # 由于大家获取数据集的渠道不同，所以数据集的编码格式可能不同
-    # 若读取失败，可在参数栏中加入encoding = 'gb18030'
-    df = pd.read_csv('train.csv', usecols=range(3, 27))
-    x, y, _ = dataProcess(df)
-    #划分训练集与验证集
-    x_train, y_train = x[0:3200], y[0:3200]
-    x_val, y_val = x[3200:3600], y[3200:3600]
-    epoch = 2000 # 训练轮数
-    # 开始训练
-    w, b = train(x_train, y_train, epoch)
-    # 在验证集上看效果
-    loss = validate(x_val, y_val, w, b)
-    print('The loss on val data is:', loss)
-
-if __name__ == '__main__':
-    main()
+    loss = loss/(2*m)
+    print(loss)
+    w = w+theta*gradient/m
